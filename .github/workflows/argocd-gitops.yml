@@ -40,7 +40,7 @@ jobs:
             ENV="${{ github.event.inputs.environment }}"
           else
             case "${GITHUB_REF##*/}" in
-              main)     ENV="production" ;;
+              main)     ENV="staging" ;;
               staging)  ENV="staging" ;;
               *)        echo "❌ Invalid branch" && exit 1 ;;
             esac
@@ -48,7 +48,7 @@ jobs:
           
           echo "environment=$ENV" >> $GITHUB_OUTPUT
           echo "values-file=values-$ENV.yaml" >> $GITHUB_OUTPUT
-          echo "🎯 Target environment: $ENV"
+          echo "🎯 Target environment: $ENV (both main and staging deploy to staging)"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

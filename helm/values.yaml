@@ -111,8 +111,8 @@ argocd:
   enabled: true
   namespace: argocd
   project: default
-  repoURL: https://github.com/ClickHouse/mcp-clickhouse.git
-  targetRevision: HEAD
+  repoURL: https://github.com/MessagePolly/mcp-clickhouse.git
+  targetRevision: main
   path: helm
   destinationServer: https://kubernetes.default.svc
   autoSync:
