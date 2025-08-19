@@ -444,3 +444,4 @@ uv run pytest -v tests/test_chdb_tool.py # chDB only
 ## YouTube Overview
 
 [![YouTube](http://i.ytimg.com/vi/y9biAm_Fkqw/hqdefault.jpg)](https://www.youtube.com/watch?v=y9biAm_Fkqw)
+# Trigger deployment after fixing secret key mismatch
