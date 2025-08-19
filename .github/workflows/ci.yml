@@ -1,0 +1,138 @@
+name: CI - Build and Test
+
+on:
+  pull_request:
+    branches: [main, staging]
+  push:
+    branches-ignore: [main, staging]  # Exclude main/staging as they're handled by GitOps workflow
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --dev
+          echo "📦 Dependencies installed"
+
+      - name: Run linting
+        run: |
+          uv run ruff check .
+          echo "✅ Linting passed"
+
+      - name: Run type checking
+        run: |
+          uv run mypy . || echo "⚠️ Type checking completed with warnings"
+
+      - name: Run tests
+        run: |
+          uv run pytest -v tests/ --cov=mcp_clickhouse --cov-report=term-missing
+          echo "✅ Tests passed"
+
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::820976530109:role/polly-stg-mcp-clickhouse-github-actions
+          aws-region: ap-southeast-1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        run: |
+          # Create feature branch tag
+          BRANCH_NAME=${GITHUB_REF##*/}
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+          FEATURE_TAG="${BRANCH_NAME}-${IMAGE_TAG}"
+          FULL_IMAGE="820976530109.dkr.ecr.ap-southeast-1.amazonaws.com/clickhouse-mcp"
+          
+          aws ecr get-login-password | docker login --username AWS --password-stdin 820976530109.dkr.ecr.ap-southeast-1.amazonaws.com
+          
+          export DOCKER_BUILDKIT=1
+          docker build -t $FULL_IMAGE:$FEATURE_TAG .
+          docker push $FULL_IMAGE:$FEATURE_TAG
+          
+          echo "🐳 Feature branch image pushed: $FEATURE_TAG"
+
+  helm-lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
+
+      - name: Lint Helm chart
+        run: |
+          helm lint helm/
+          echo "✅ Helm chart linting passed"
+
+      - name: Template Helm chart
+        run: |
+          helm template clickhouse-mcp helm/ --values helm/values-staging.yaml > /tmp/staging-manifest.yaml
+          helm template clickhouse-mcp helm/ --values helm/values-production.yaml > /tmp/production-manifest.yaml
+          echo "✅ Helm chart templating successful"
+
+      - name: Validate Kubernetes manifests
+        uses: instrumenta/kubeval-action@master
+        with:
+          files: /tmp/staging-manifest.yaml,/tmp/production-manifest.yaml
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

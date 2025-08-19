@@ -1,0 +1,56 @@
+# Staging environment values for clickhouse-mcp
+# This overrides values in values.yaml
+
+replicaCount: 1
+
+image:
+  repository: 820976530109.dkr.ecr.ap-southeast-1.amazonaws.com/clickhouse-mcp
+  pullPolicy: Always
+  tag: "staging"
+
+fullnameOverride: "clickhouse-mcp"
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 150m
+    memory: 192Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+
+# Application-specific configurations
+app:
+  port: 8000
+  env: staging
+
+# Environment variables
+env:
+  CLICKHOUSE_MCP_SERVER_TRANSPORT: "http"
+  CLICKHOUSE_MCP_BIND_HOST: "0.0.0.0"
+  CLICKHOUSE_MCP_BIND_PORT: "8000"
+  CLICKHOUSE_SECURE: "true"
+  CLICKHOUSE_VERIFY: "true"
+  CLICKHOUSE_CONNECT_TIMEOUT: "30"
+  CLICKHOUSE_SEND_RECEIVE_TIMEOUT: "30"
+
+# ArgoCD configuration for staging
+argocd:
+  enabled: true
+  namespace: argocd
+  project: default
+  repoURL: https://github.com/ClickHouse/mcp-clickhouse.git
+  targetRevision: staging
+  path: helm
+  destinationServer: https://kubernetes.default.svc
+  additionalValueFiles:
+    - values-staging.yaml
+  autoSync:
+    enabled: true
+    prune: true
+    selfHeal: true
+    allowEmpty: false

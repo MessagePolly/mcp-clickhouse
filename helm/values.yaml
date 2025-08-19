@@ -1,0 +1,129 @@
+# Default values for clickhouse-mcp
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: 820976530109.dkr.ecr.ap-southeast-1.amazonaws.com/clickhouse-mcp
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "clickhouse-mcp"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8000
+
+# ClickHouse secrets are managed by Terraform via External Secrets Operator
+# The secret 'clickhouse-mcp-secret' is automatically created from AWS Secrets Manager
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application-specific configurations
+app:
+  port: 8000
+  env: development
+
+# Environment variables
+env:
+  CLICKHOUSE_MCP_SERVER_TRANSPORT: "http"
+  CLICKHOUSE_MCP_BIND_HOST: "0.0.0.0"
+  CLICKHOUSE_MCP_BIND_PORT: "8000"
+  CLICKHOUSE_SECURE: "true"
+  CLICKHOUSE_VERIFY: "true"
+  CLICKHOUSE_CONNECT_TIMEOUT: "30"
+  CLICKHOUSE_SEND_RECEIVE_TIMEOUT: "30"
+
+# Health checks
+healthCheck:
+  enabled: true
+  path: /health
+  port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+# Readiness checks  
+readinessCheck:
+  enabled: true
+  path: /health
+  port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# ArgoCD configuration (enabled for GitOps)
+argocd:
+  enabled: true
+  namespace: argocd
+  project: default
+  repoURL: https://github.com/ClickHouse/mcp-clickhouse.git
+  targetRevision: HEAD
+  path: helm
+  destinationServer: https://kubernetes.default.svc
+  autoSync:
+    enabled: true
+    prune: true
+    selfHeal: true
+    allowEmpty: false
+  retry:
+    limit: 5
+    backoff:
+      duration: 5s
+      factor: 2
+      maxDuration: 3m
+  revisionHistoryLimit: 3

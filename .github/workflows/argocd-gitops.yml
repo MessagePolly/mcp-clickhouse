@@ -1,0 +1,169 @@
+name: GitOps Deploy via ArgoCD
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  ECR_REGISTRY: 820976530109.dkr.ecr.ap-southeast-1.amazonaws.com
+  ECR_REPOSITORY: clickhouse-mcp
+  EKS_CLUSTER: polly-k8s-stg
+  IAM_ROLE: arn:aws:iam::820976530109:role/polly-stg-mcp-clickhouse-github-actions
+
+jobs:
+  gitops-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          else
+            case "${GITHUB_REF##*/}" in
+              main)     ENV="production" ;;
+              staging)  ENV="staging" ;;
+              *)        echo "❌ Invalid branch" && exit 1 ;;
+            esac
+          fi
+          
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "values-file=values-$ENV.yaml" >> $GITHUB_OUTPUT
+          echo "🎯 Target environment: $ENV"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.IAM_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+          FULL_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
+          
+          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+          
+          export DOCKER_BUILDKIT=1
+          docker build -t $FULL_IMAGE:$IMAGE_TAG -t $FULL_IMAGE:latest .
+          docker push $FULL_IMAGE:$IMAGE_TAG
+          docker push $FULL_IMAGE:latest
+          
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "🐳 Image built and pushed: $IMAGE_TAG"
+
+      - name: Setup Kubernetes access
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
+          kubectl version --client
+
+      - name: Deploy/Update ArgoCD Application
+        run: |
+          ENV="${{ steps.env.outputs.environment }}"
+          VALUES_FILE="${{ steps.env.outputs.values-file }}"
+          APP_NAME="clickhouse-mcp"
+          RELEASE_NAME="clickhouse-mcp"  # Match fullnameOverride
+          
+          # Create ArgoCD Application manifest
+          cat <<EOF > argocd-app.yaml
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: $APP_NAME
+            namespace: argocd
+            labels:
+              environment: $ENV
+              app: clickhouse-mcp
+          spec:
+            project: default
+            source:
+              repoURL: ${{ github.server_url }}/${{ github.repository }}.git
+              targetRevision: ${{ github.ref_name }}
+              path: helm
+              helm:
+                releaseName: $RELEASE_NAME
+                valueFiles:
+                  - values.yaml
+                  - $VALUES_FILE
+                parameters:
+                  - name: image.tag
+                    value: "$IMAGE_TAG"
+                  - name: image.repository
+                    value: "${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: mcp-services
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+                - CreateNamespace=true
+                - PrunePropagationPolicy=foreground
+            revisionHistoryLimit: 5
+          EOF
+          
+          # Apply the application
+          kubectl apply -f argocd-app.yaml
+          echo "✅ ArgoCD Application $APP_NAME created/updated"
+
+      - name: Wait for ArgoCD sync
+        if: ${{ vars.WAIT_FOR_SYNC == 'true' }}
+        run: |
+          ENV="${{ steps.env.outputs.environment }}"
+          APP_NAME="clickhouse-mcp"
+          
+          echo "⏳ Waiting for ArgoCD to sync..."
+          
+          # Install ArgoCD CLI if not present
+          if ! command -v argocd &> /dev/null; then
+            curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+            chmod +x argocd
+            sudo mv argocd /usr/local/bin/
+          fi
+          
+          # Wait for sync (if ArgoCD CLI access is configured)
+          if [[ -n "${{ secrets.ARGOCD_AUTH_TOKEN }}" ]]; then
+            argocd login ${{ vars.ARGOCD_SERVER }} --auth-token ${{ secrets.ARGOCD_AUTH_TOKEN }} --insecure
+            argocd app sync $APP_NAME --timeout 600
+            argocd app wait $APP_NAME --timeout 600 --health
+            echo "✅ ArgoCD sync completed"
+          else
+            echo "ℹ️ ArgoCD CLI access not configured, skipping sync wait"
+          fi
+
+      - name: Verify deployment
+        run: |
+          ENV="${{ steps.env.outputs.environment }}"
+          
+          echo "📊 Deployment verification for $ENV environment:"
+          
+          # Check if deployment exists
+          if kubectl get deployment clickhouse-mcp -n mcp-services &>/dev/null; then
+            kubectl get deployment clickhouse-mcp -n mcp-services
+            kubectl get pods -l app.kubernetes.io/name=clickhouse-mcp -n mcp-services
+            echo "✅ Deployment verified successfully"
+          else
+            echo "⏳ Deployment not yet available, ArgoCD may still be syncing"
+          fi
+          
+          echo "🎯 GitOps deployment to $ENV completed!"
