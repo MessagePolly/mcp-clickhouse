@@ -1,0 +1,89 @@
+# Production environment values for clickhouse-mcp
+# This overrides values in values.yaml
+
+replicaCount: 2
+
+image:
+  repository: 820976530109.dkr.ecr.ap-southeast-1.amazonaws.com/clickhouse-mcp
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+fullnameOverride: "clickhouse-mcp"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Application-specific configurations
+app:
+  port: 8000
+  env: production
+
+# Environment variables
+env:
+  CLICKHOUSE_MCP_SERVER_TRANSPORT: "http"
+  CLICKHOUSE_MCP_BIND_HOST: "0.0.0.0"
+  CLICKHOUSE_MCP_BIND_PORT: "8000"
+  CLICKHOUSE_SECURE: "true"
+  CLICKHOUSE_VERIFY: "true"
+  CLICKHOUSE_CONNECT_TIMEOUT: "60"
+  CLICKHOUSE_SEND_RECEIVE_TIMEOUT: "300"
+
+# Health checks with more aggressive settings for production
+healthCheck:
+  enabled: true
+  path: /health
+  port: 8000
+  initialDelaySeconds: 45
+  periodSeconds: 30
+  timeoutSeconds: 10
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessCheck:
+  enabled: true
+  path: /health
+  port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+# ArgoCD configuration for production
+argocd:
+  enabled: true
+  namespace: argocd
+  project: default
+  repoURL: https://github.com/ClickHouse/mcp-clickhouse.git
+  targetRevision: main
+  path: helm
+  destinationServer: https://kubernetes.default.svc
+  additionalValueFiles:
+    - values-production.yaml
+  autoSync:
+    enabled: true
+    prune: true
+    selfHeal: true
+    allowEmpty: false
+
+# Production node selector and tolerations
+nodeSelector:
+  node-type: application
+
+tolerations:
+  - key: "application"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"

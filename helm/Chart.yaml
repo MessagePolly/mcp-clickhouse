@@ -1,0 +1,17 @@
+apiVersion: v2
+name: clickhouse-mcp
+description: A Helm chart for ClickHouse MCP Service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - mcp
+  - clickhouse
+  - database
+  - api
+home: https://github.com/ClickHouse/mcp-clickhouse
+sources:
+  - https://github.com/ClickHouse/mcp-clickhouse
+maintainers:
+  - name: ClickHouse Team
+    email: support@clickhouse.com
