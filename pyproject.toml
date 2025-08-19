@@ -22,9 +22,7 @@ Home = "https://github.com/ClickHouse/mcp-clickhouse"
 
 [project.optional-dependencies]
 dev = [
-    "ruff",
-    "pytest",
-    "pytest-asyncio"
+    "ruff"
 ]
 
 [tool.hatch.build.targets.wheel]
