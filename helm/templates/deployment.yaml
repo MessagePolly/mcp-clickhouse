@@ -63,11 +63,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "clickhouse-mcp.fullname" $ }}-secret
                   key: CLICKHOUSE_PASSWORD
-            - name: CLICKHOUSE_DB
+            - name: CLICKHOUSE_DATABASE
               valueFrom:
                 secretKeyRef:
                   name: {{ include "clickhouse-mcp.fullname" $ }}-secret
-                  key: CLICKHOUSE_DB
+                  key: CLICKHOUSE_DATABASE
           {{- if .Values.readinessCheck.enabled }}
           readinessProbe:
             httpGet:
