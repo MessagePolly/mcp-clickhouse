@@ -15,10 +15,12 @@ from fastmcp.prompts import Prompt
 from fastmcp.exceptions import ToolError
 from dataclasses import dataclass, field, asdict, is_dataclass
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import PlainTextResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from mcp_clickhouse.mcp_env import get_config, get_chdb_config
 from mcp_clickhouse.chdb_prompt import CHDB_PROMPT
+from mcp_clickhouse.thread_session_handler import handle_thread_session_request
 
 
 @dataclass
@@ -76,6 +78,38 @@ mcp = FastMCP(
         "chdb",
     ],
 )
+
+
+# Thread-based session support route
+@mcp.custom_route("/mcp-thread", methods=["POST"])
+async def thread_session_mcp(request: Request) -> JSONResponse:
+    """Handle MCP requests using thread IDs as session IDs.
+
+    This endpoint bypasses FastMCP's session management and accepts
+    any session ID provided in the headers (X-Session-ID or mcp-session-id).
+    """
+    if os.getenv("MCP_SESSION_BYPASS", "false").lower() == "true":
+        return await handle_thread_session_request(request, mcp)
+    else:
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32000,
+                "message": "Thread session support is disabled. Set MCP_SESSION_BYPASS=true to enable."
+            },
+            "id": None
+        }, status_code=403)
+
+
+@mcp.custom_route("/mcp-thread/status", methods=["GET"])
+async def thread_session_status(request: Request) -> JSONResponse:
+    """Check thread session support status."""
+    enabled = os.getenv("MCP_SESSION_BYPASS", "false").lower() == "true"
+    return JSONResponse({
+        "thread_session_enabled": enabled,
+        "endpoint": "/mcp-thread" if enabled else None,
+        "message": "Thread session support allows using thread IDs as session IDs" if enabled else "Thread session support is disabled"
+    })
 
 
 @mcp.custom_route("/health", methods=["GET"])
