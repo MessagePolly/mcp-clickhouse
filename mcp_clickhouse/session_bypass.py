@@ -21,7 +21,7 @@ def is_session_bypass_enabled() -> bool:
 
 def register_thread_session(session_id: str) -> None:
     """Register a thread ID as a valid session.
-    
+
     Args:
         session_id: The thread/session ID to register
     """
@@ -36,36 +36,36 @@ def register_thread_session(session_id: str) -> None:
 
 def is_valid_thread_session(session_id: str) -> bool:
     """Check if a session ID is valid (when bypass is enabled).
-    
+
     Args:
         session_id: The session ID to validate
-        
+
     Returns:
         True if the session is valid or bypass is enabled
     """
     if not session_id:
         return False
-    
+
     if is_session_bypass_enabled():
         # In bypass mode, auto-register any session ID
         register_thread_session(session_id)
         return True
-    
+
     # Normal mode - check if session exists
     return session_id in THREAD_SESSIONS
 
 
 def extract_session_id(headers: Dict[str, str]) -> Optional[str]:
     """Extract session ID from request headers.
-    
+
     Looks for session ID in various header formats:
     - X-Session-ID
     - mcp-session-id
     - x-session-id (lowercase)
-    
+
     Args:
         headers: Request headers dictionary
-        
+
     Returns:
         The session ID if found, None otherwise
     """
@@ -74,14 +74,14 @@ def extract_session_id(headers: Dict[str, str]) -> Optional[str]:
         session_id = headers.get(header_name)
         if session_id:
             return session_id
-    
+
     # Also check lowercase versions
     headers_lower = {k.lower(): v for k, v in headers.items()}
     for header_name in ["x-session-id", "mcp-session-id"]:
         session_id = headers_lower.get(header_name)
         if session_id:
             return session_id
-    
+
     return None
 
 

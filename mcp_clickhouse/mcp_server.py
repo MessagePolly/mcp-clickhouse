@@ -20,12 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from mcp_clickhouse.mcp_env import get_config, get_chdb_config
 from mcp_clickhouse.chdb_prompt import CHDB_PROMPT
-from mcp_clickhouse.session_bypass import (
-    is_session_bypass_enabled,
-    extract_session_id,
-    register_thread_session,
-    is_valid_thread_session
-)
+from mcp_clickhouse.thread_session_handler import handle_thread_session_request
 
 
 @dataclass
@@ -85,53 +80,35 @@ mcp = FastMCP(
 )
 
 
-# Session bypass middleware for accepting thread IDs as session IDs
-class SessionBypassMiddleware(BaseHTTPMiddleware):
-    """Middleware to bypass session validation when enabled."""
-    
-    async def dispatch(self, request: Request, call_next):
-        """Process requests and handle session bypass."""
-        if is_session_bypass_enabled():
-            # Extract session ID from headers
-            headers = dict(request.headers)
-            session_id = extract_session_id(headers)
-            
-            if session_id:
-                # Register this as a valid session
-                register_thread_session(session_id)
-                logger.info(f"Session bypass: Accepted session ID {session_id}")
-            
-            # Check if this is an MCP request that needs session handling
-            if request.url.path.startswith("/mcp"):
-                # Store session ID in request state for FastMCP to use
-                request.state.session_id = session_id
-                request.state.session_bypass = True
-        
-        response = await call_next(request)
-        return response
+# Thread-based session support route
+@mcp.custom_route("/mcp-thread", methods=["POST"])
+async def thread_session_mcp(request: Request) -> JSONResponse:
+    """Handle MCP requests using thread IDs as session IDs.
+
+    This endpoint bypasses FastMCP's session management and accepts
+    any session ID provided in the headers (X-Session-ID or mcp-session-id).
+    """
+    if os.getenv("MCP_SESSION_BYPASS", "false").lower() == "true":
+        return await handle_thread_session_request(request, mcp)
+    else:
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            "error": {
+                "code": -32000,
+                "message": "Thread session support is disabled. Set MCP_SESSION_BYPASS=true to enable."
+            },
+            "id": None
+        }, status_code=403)
 
 
-# Add middleware when HTTP/SSE transport is used
-if os.getenv("CLICKHOUSE_MCP_SERVER_TRANSPORT", "stdio").lower() in ["http", "sse"]:
-    # Add the middleware to the FastMCP app
-    @mcp.on_event("startup")
-    async def startup_event():
-        """Add session bypass middleware on startup."""
-        if is_session_bypass_enabled():
-            logger.info("Session bypass mode enabled - will accept any session ID")
-            # Note: FastMCP's app is available after initialization
-            if hasattr(mcp, 'app'):
-                mcp.app.add_middleware(SessionBypassMiddleware)
-        else:
-            logger.info("Session bypass mode disabled - normal session validation")
-
-
-@mcp.custom_route("/mcp/session-bypass", methods=["GET"])
-async def session_bypass_status(request: Request) -> JSONResponse:
-    """Check session bypass status."""
+@mcp.custom_route("/mcp-thread/status", methods=["GET"])
+async def thread_session_status(request: Request) -> JSONResponse:
+    """Check thread session support status."""
+    enabled = os.getenv("MCP_SESSION_BYPASS", "false").lower() == "true"
     return JSONResponse({
-        "session_bypass_enabled": is_session_bypass_enabled(),
-        "message": "Session bypass allows thread IDs as session IDs" if is_session_bypass_enabled() else "Normal session validation"
+        "thread_session_enabled": enabled,
+        "endpoint": "/mcp-thread" if enabled else None,
+        "message": "Thread session support allows using thread IDs as session IDs" if enabled else "Thread session support is disabled"
     })
 
 
