@@ -161,7 +161,8 @@ You can also enable both ClickHouse and chDB simultaneously:
         "CLICKHOUSE_CONNECT_TIMEOUT": "30",
         "CLICKHOUSE_SEND_RECEIVE_TIMEOUT": "30",
         "CHDB_ENABLED": "true",
-        "CHDB_DATA_PATH": "/path/to/chdb/data"
+        "CHDB_DATA_PATH": "/path/to/chdb/data",
+        "MCP_SESSION_BYPASS": "false"
       }
     }
   }
@@ -314,6 +315,11 @@ The following environment variables are used to configure the ClickHouse and chD
 * `CLICKHOUSE_MCP_BIND_PORT`: Port to bind the MCP server to when using HTTP or SSE transport
   * Default: `"8000"`
   * Only used when transport is `"http"` or `"sse"`
+* `MCP_SESSION_BYPASS`: Enable session bypass mode for HTTP/SSE transports
+  * Default: `"false"`
+  * Set to `"true"` to accept any session ID (including thread IDs) without validation
+  * Useful for integrations that use thread IDs or custom identifiers as session IDs
+  * Only affects HTTP and SSE transports (stdio transport doesn't use sessions)
 * `CLICKHOUSE_ENABLED`: Enable/disable ClickHouse functionality
   * Default: `"true"`
   * Set to `"false"` to disable ClickHouse tools when using chDB only
