@@ -162,6 +162,55 @@ class ClickHouseConfig:
         """
         return int(os.getenv("CLICKHOUSE_MCP_BIND_PORT", "8000"))
 
+    # New Relic configuration properties
+    @property
+    def newrelic_license_key(self) -> Optional[str]:
+        """Get the New Relic license key.
+        
+        If not set, New Relic monitoring will be disabled.
+        """
+        return os.getenv("NEW_RELIC_LICENSE_KEY")
+
+    @property
+    def newrelic_app_name(self) -> str:
+        """Get the New Relic application name.
+        
+        Default: mcp-clickhouse
+        """
+        return os.getenv("NEW_RELIC_APP_NAME", "mcp-clickhouse")
+
+    @property
+    def newrelic_log_level(self) -> str:
+        """Get the New Relic log level.
+        
+        Default: info
+        """
+        return os.getenv("NEW_RELIC_LOG_LEVEL", "info")
+
+    @property
+    def newrelic_log_file(self) -> str:
+        """Get the New Relic log file path.
+        
+        Default: /tmp/newrelic_agent.log
+        """
+        return os.getenv("NEW_RELIC_LOG_FILE", "/tmp/newrelic_agent.log")
+
+    @property
+    def newrelic_high_security(self) -> bool:
+        """Get whether New Relic high security mode is enabled.
+        
+        Default: False
+        """
+        return os.getenv("NEW_RELIC_HIGH_SECURITY", "false").lower() == "true"
+
+    @property
+    def newrelic_environment(self) -> str:
+        """Get the New Relic environment.
+        
+        Default: production
+        """
+        return os.getenv("NEW_RELIC_ENVIRONMENT", "production")
+
     def get_client_config(self) -> dict:
         """Get the configuration dictionary for clickhouse_connect client.
 

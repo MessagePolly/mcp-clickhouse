@@ -1,3 +1,6 @@
+# Initialize New Relic first (must be before other imports)
+from .newrelic_config import newrelic_agent
+
 from .mcp_server import mcp
 from .mcp_env import get_config, TransportType
 

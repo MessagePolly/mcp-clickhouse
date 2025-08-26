@@ -61,6 +61,18 @@ readinessCheck:
   successThreshold: 1
   failureThreshold: 3
 
+# New Relic configuration for production
+newrelic:
+  enabled: true
+  appName: "mcp-clickhouse"
+  logLevel: "info"
+  highSecurity: false
+  environment: "production"
+  logging:
+    enabled: true
+    forwarding: true
+    localDecorating: true
+
 # ArgoCD configuration for production
 argocd:
   enabled: true

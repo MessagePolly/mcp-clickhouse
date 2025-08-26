@@ -21,6 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from mcp_clickhouse.mcp_env import get_config, get_chdb_config
 from mcp_clickhouse.chdb_prompt import CHDB_PROMPT
 from mcp_clickhouse.thread_session_handler import handle_thread_session_request
+from mcp_clickhouse.newrelic_config import newrelic_agent
 
 
 @dataclass
@@ -57,11 +58,24 @@ class Table:
 
 MCP_SERVER_NAME = "mcp-clickhouse"
 
-# Configure logging
+# Configure logging with New Relic integration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(MCP_SERVER_NAME)
+
+# Add New Relic error tracking decorator if available
+def track_errors_with_newrelic(func):
+    """Decorator to track errors with New Relic if available."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if newrelic_agent:
+                newrelic_agent.notice_error()
+            logger.error(f"Error in {func.__name__}: {e}")
+            raise
+    return wrapper
 
 QUERY_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 atexit.register(lambda: QUERY_EXECUTOR.shutdown(wait=True))

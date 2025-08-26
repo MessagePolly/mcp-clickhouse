@@ -38,6 +38,18 @@ env:
   CLICKHOUSE_CONNECT_TIMEOUT: "30"
   CLICKHOUSE_SEND_RECEIVE_TIMEOUT: "30"
 
+# New Relic configuration for staging
+newrelic:
+  enabled: true
+  appName: "mcp-clickhouse"
+  logLevel: "info"
+  highSecurity: false
+  environment: "staging"
+  logging:
+    enabled: true
+    forwarding: true
+    localDecorating: true
+
 # ArgoCD configuration for staging
 argocd:
   enabled: true

@@ -36,6 +36,9 @@ WORKDIR /app
 # Copy the virtual environment from the builder stage
 COPY --from=builder /app/.venv /app/.venv
 
+# Copy New Relic configuration file
+COPY --from=builder /app/newrelic.ini /app/newrelic.ini
+
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 

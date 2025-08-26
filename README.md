@@ -6,6 +6,27 @@ An MCP server for ClickHouse.
 
 <a href="https://glama.ai/mcp/servers/yvjy4csvo1"><img width="380" height="200" src="https://glama.ai/mcp/servers/yvjy4csvo1/badge" alt="mcp-clickhouse MCP server" /></a>
 
+## New Relic Integration
+
+The MCP ClickHouse server includes optional New Relic APM monitoring for performance and error tracking.
+
+### Environment Variables
+
+To enable New Relic monitoring, set the following environment variables:
+
+- `NEW_RELIC_LICENSE_KEY`: Your New Relic license key (required)
+- `NEW_RELIC_APP_NAME`: Application name in New Relic (default: "mcp-clickhouse")
+- `NEW_RELIC_LOG_LEVEL`: Log level for New Relic agent (default: "info")
+- `NEW_RELIC_LOG_FILE`: Log file path (default: "/tmp/newrelic_agent.log")
+- `NEW_RELIC_HIGH_SECURITY`: Enable high security mode (default: "false")
+- `NEW_RELIC_ENVIRONMENT`: Environment name (default: "production")
+
+### Configuration
+
+The New Relic license key should be stored as a GitHub organization secret named `NEW_RELIC_LICENSE_KEY`. The GitOps workflow will automatically create the required Kubernetes secret during deployment.
+
+If no `NEW_RELIC_LICENSE_KEY` is provided, New Relic monitoring is automatically disabled and the application will run normally.
+
 ## Features
 
 ### ClickHouse Tools
