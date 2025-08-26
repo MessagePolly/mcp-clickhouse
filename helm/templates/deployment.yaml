@@ -68,6 +68,28 @@ spec:
                 secretKeyRef:
                   name: {{ include "clickhouse-mcp.fullname" $ }}-secret
                   key: CLICKHOUSE_DATABASE
+            {{- if .Values.newrelic.enabled }}
+            # New Relic configuration (license key from GitHub Actions created secret)
+            - name: NEW_RELIC_APP_NAME
+              value: {{ .Values.newrelic.appName | quote }}
+            - name: NEW_RELIC_LOG_LEVEL
+              value: {{ .Values.newrelic.logLevel | quote }}
+            - name: NEW_RELIC_HIGH_SECURITY
+              value: {{ .Values.newrelic.highSecurity | quote }}
+            - name: NEW_RELIC_ENVIRONMENT
+              value: {{ .Values.newrelic.environment | quote }}
+            - name: NEW_RELIC_APPLICATION_LOGGING_ENABLED
+              value: {{ .Values.newrelic.logging.enabled | quote }}
+            - name: NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED
+              value: {{ .Values.newrelic.logging.forwarding | quote }}
+            - name: NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED
+              value: {{ .Values.newrelic.logging.localDecorating | quote }}
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "clickhouse-mcp.fullname" $ }}-newrelic-secret
+                  key: NEW_RELIC_LICENSE_KEY
+            {{- end }}
           {{- if .Values.readinessCheck.enabled }}
           readinessProbe:
             httpGet:

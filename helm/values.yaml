@@ -37,6 +37,9 @@ service:
 # ClickHouse secrets are managed by Terraform via External Secrets Operator
 # The secret 'clickhouse-mcp-secret' is automatically created from AWS Secrets Manager
 
+# New Relic secrets are managed by GitHub Actions GitOps workflow
+# The secret 'clickhouse-mcp-newrelic-secret' is automatically created from NEW_RELIC_LICENSE_KEY GitHub org secret
+
 ingress:
   enabled: false
   className: ""
@@ -105,6 +108,18 @@ readinessCheck:
   timeoutSeconds: 3
   successThreshold: 1
   failureThreshold: 3
+
+# New Relic configuration
+newrelic:
+  enabled: true
+  appName: "mcp-clickhouse"
+  logLevel: "info"
+  highSecurity: false
+  environment: "development"
+  logging:
+    enabled: true
+    forwarding: true
+    localDecorating: true
 
 # ArgoCD configuration (enabled for GitOps)
 argocd:
