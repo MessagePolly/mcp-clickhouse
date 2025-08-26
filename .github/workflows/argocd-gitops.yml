@@ -81,35 +81,14 @@ jobs:
       - name: Create/Update New Relic Secret
         run: |
           ENV="${{ steps.env.outputs.environment }}"
-          NAMESPACE="mcp-services"
-          SECRET_NAME="clickhouse-mcp-newrelic-secret"
           
-          echo "🔐 Creating New Relic secret for $ENV environment..."
-          
-          # Create namespace if it doesn't exist
-          kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Check if New Relic license key is available
-          if [[ -z "${{ secrets.NEW_RELIC_LICENSE_KEY }}" ]]; then
-            echo "⚠️ NEW_RELIC_LICENSE_KEY not found in GitHub secrets"
-            echo "New Relic monitoring will be disabled"
-            
-            # Create an empty secret to satisfy the deployment template
-            kubectl create secret generic $SECRET_NAME \
-              --from-literal=NEW_RELIC_LICENSE_KEY="" \
-              --namespace=$NAMESPACE \
-              --dry-run=client -o yaml | kubectl apply -f -
-          else
-            echo "✅ Creating New Relic secret with license key"
-            
-            # Create secret with actual license key
-            kubectl create secret generic $SECRET_NAME \
-              --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
-              --namespace=$NAMESPACE \
-              --dry-run=client -o yaml | kubectl apply -f -
-          fi
-          
-          echo "🔐 New Relic secret created/updated: $SECRET_NAME"
+          # Create or update NewRelic secret
+          echo "🔑 Creating/updating NewRelic secret..."
+          kubectl create secret generic clickhouse-mcp-newrelic-secret \
+            --namespace=mcp-services \
+            --from-literal=NEW_RELIC_LICENSE_KEY="${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✅ NewRelic secret created/updated"
 
       - name: Deploy/Update ArgoCD Application
         continue-on-error: true
